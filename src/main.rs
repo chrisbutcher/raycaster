@@ -52,9 +52,10 @@ pub fn main() -> Result<(), String> {
              0              0\
              0002222222200000";
 
-  let player_x = 3.456_f32;
-  let player_y = 2.345_f32;
-  let player_a = 1.523_f32;
+  let player_x = 3.456_f64;
+  let player_y = 2.345_f64;
+  let player_a = 1.523_f64;
+  const fov: f64 = std::f64::consts::PI / 3.0;
 
   let mut event_pump = sdl_context.event_pump()?;
 
@@ -77,8 +78,8 @@ pub fn main() -> Result<(), String> {
     // Draw bg
     for j in 0..win_w {
       for i in 0..win_h {
-        let r = 255.0 * j as f32 / win_h as f32;
-        let g = 255.0 * i as f32 / win_w as f32;
+        let r = 255.0 * j as f64 / win_h as f64;
+        let g = 255.0 * i as f64 / win_w as f64;
         let b = 0;
 
         let offset = j * (3 * 512) + i * 3;
@@ -120,53 +121,46 @@ pub fn main() -> Result<(), String> {
       &mut framebuffer,
       win_w,
       win_h,
-      (player_x * rect_w as f32) as usize,
-      (player_y * rect_h as f32) as usize,
+      (player_x * rect_w as f64) as usize,
+      (player_y * rect_h as f64) as usize,
       5,
       5,
       sdl2::pixels::Color::RGB(255, 255, 255),
     );
 
-    // Draw ray from player to wall
+    for i in 0..win_w {
+      let angle = player_a - fov/2.0 + fov * i as f64 / win_w as f64;
 
-    let mut t = 0.0_f32;
-    loop {
-      let cx = player_x + t * player_a.cos();
-      let cy = player_y + t * player_a.sin();
+      let mut t = 0.0_f64;
+      loop {
+        let cx = player_x + t * angle.cos();
+        let cy = player_y + t * angle.sin();
 
-      let map_index = cx as usize + cy as usize * map_w;
+        if map
+          .chars()
+          .nth(cx as usize + cy as usize * map_w)
+          .unwrap_or('0')
+          != ' '
+        {
+          break;
+        }
 
-      println!("map index: {}", map_index);
+        let pix_x = (cx * rect_w as f64) as usize;
+        let pix_y = (cy * rect_h as f64) as usize;
 
-      let map_char = map.chars().nth(map_index).unwrap();
+        let offset = (pix_x + pix_y * win_w) * 3;
 
-      println!("map char: {}", map_char);
+        framebuffer[offset] = 255;
+        framebuffer[offset + 1] = 255;
+        framebuffer[offset + 2] = 255;
 
-      if map_char != ' ' {
-        break;
-      }
+        t = t + 0.05;
 
-      let pix_x = cx as usize * rect_w;
-      let pix_y = cy as usize * rect_h;
-
-      let offset = (pix_x + pix_y*win_w) * 3;
-
-      framebuffer[offset] = 255;
-      framebuffer[offset + 1] = 255;
-      framebuffer[offset + 2] = 255;
-
-      t = t + 0.05;
-
-      println!("t: {}", t);
-
-      if t > 20.0 {
-        println!("breaking? {}", t);
-        // break;
+        if t > 20.0 {
+          break;
+        }
       }
     }
-
-    panic!("hi");
-
 
     // Game loop END
 
@@ -184,7 +178,7 @@ pub fn main() -> Result<(), String> {
 }
 
 fn draw_rectangle(
-  buffer: &mut [u8],
+  framebuffer: &mut [u8],
   img_w: usize,
   img_h: usize,
   x: usize,
@@ -200,9 +194,9 @@ fn draw_rectangle(
 
       let offset = (cx + cy * img_w) * 3; // SDL2, 24-bit colour specific tweak: multiply original offset b 3.
 
-      buffer[offset] = color.r;
-      buffer[offset + 1] = color.g;
-      buffer[offset + 2] = color.b;
+      framebuffer[offset] = color.r;
+      framebuffer[offset + 1] = color.g;
+      framebuffer[offset + 2] = color.b;
     }
   }
 }
