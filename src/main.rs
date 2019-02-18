@@ -13,8 +13,11 @@ pub fn main() -> Result<(), String> {
   let sdl_context = sdl2::init()?;
   let video_subsystem = sdl_context.video()?;
 
+  const WIN_W: usize = 1024;
+  const WIN_H: usize = 512;
+
   let window = video_subsystem
-    .window("rust-sdl2 demo: Video", 1024, 512)
+    .window("raycaster", WIN_W as u32, WIN_H as u32)
     .position_centered()
     .opengl()
     .build()
@@ -24,17 +27,15 @@ pub fn main() -> Result<(), String> {
   let texture_creator = canvas.texture_creator();
 
   let mut texture = texture_creator
-    .create_texture_streaming(PixelFormatEnum::RGB24, 1024, 512)
+    .create_texture_streaming(PixelFormatEnum::RGB24, WIN_W as u32, WIN_H as u32)
     .map_err(|e| e.to_string())?;
 
-  // Raycaster code port
-  let win_w = 1024;
-  let win_h = 512;
+  // Raycaster code port, from https://github.com/ssloy/tinyraycaster/wiki
 
   let map_w = 16;
   let map_h = 16;
 
-  let mut framebuffer: [u8; 512 * 1024 * 3] = [0x33; 512 * 1024 * 3];
+  let mut framebuffer: [u8; WIN_H * WIN_W * 3] = [0x33; WIN_H * WIN_W * 3];
 
   canvas.set_draw_color(sdl2::pixels::Color::RGB(33, 33, 33));
 
@@ -68,8 +69,8 @@ pub fn main() -> Result<(), String> {
       *elem = 0x33;
     }
 
-    let rect_w = win_w / (map_w * 2);
-    let rect_h = win_h / map_h;
+    let rect_w = WIN_W / (map_w * 2);
+    let rect_h = WIN_H / map_h;
 
     // Draw map
     for j in 0..map_h {
@@ -85,8 +86,8 @@ pub fn main() -> Result<(), String> {
 
         draw_rectangle(
           &mut framebuffer,
-          win_w,
-          win_h,
+          WIN_W,
+          WIN_H,
           rect_x,
           rect_y,
           rect_w,
@@ -99,8 +100,8 @@ pub fn main() -> Result<(), String> {
     // Draw player
     draw_rectangle(
       &mut framebuffer,
-      win_w,
-      win_h,
+      WIN_W,
+      WIN_H,
       (player_x * rect_w as f64) as usize,
       (player_y * rect_h as f64) as usize,
       5,
@@ -111,8 +112,8 @@ pub fn main() -> Result<(), String> {
     player_a += 2.0 * std::f64::consts::PI / 360.0;
 
     // Casting 512 rays
-    for i in 0..win_w / 2 {
-      let angle = player_a - FOV / 2.0 + FOV * i as f64 / (win_w / 2) as f64;
+    for i in 0..WIN_W / 2 {
+      let angle = player_a - FOV / 2.0 + FOV * i as f64 / (WIN_W / 2) as f64;
 
       let mut t = 0.0_f64;
       loop {
@@ -122,7 +123,7 @@ pub fn main() -> Result<(), String> {
         let pix_x = (cx * rect_w as f64) as usize;
         let pix_y = (cy * rect_h as f64) as usize;
 
-        let offset = (pix_x + pix_y * win_w) * 3;
+        let offset = (pix_x + pix_y * WIN_W) * 3;
 
         framebuffer[offset] = 160;
         framebuffer[offset + 1] = 160;
@@ -131,14 +132,14 @@ pub fn main() -> Result<(), String> {
         let wall_hit = map[cx as usize + cy as usize * map_w];
 
         if wall_hit != ' ' {
-          let column_height = (win_h as f64 / (t * (angle - player_a).cos())) as usize;
+          let column_height = (WIN_H as f64 / (t * (angle - player_a).cos())) as usize;
 
           draw_rectangle(
             &mut framebuffer,
-            win_w,
-            win_h,
-            win_w / 2 + i,
-            win_h / 2 - column_height / 2,
+            WIN_W,
+            WIN_H,
+            WIN_W / 2 + i,
+            WIN_H / 2 - column_height / 2,
             1,
             column_height,
             wall_tile_to_color(wall_hit),
@@ -157,10 +158,10 @@ pub fn main() -> Result<(), String> {
     // Game loop END
 
     texture
-      .update(Rect::new(0, 0, 1024, 512), &framebuffer, 3 * 1024)
+      .update(Rect::new(0, 0, WIN_W as u32, WIN_H as u32), &framebuffer, 3 * WIN_W)
       .unwrap();
 
-    canvas.copy(&texture, None, Some(Rect::new(0, 0, 1024, 512)))?;
+    canvas.copy(&texture, None, Some(Rect::new(0, 0, WIN_W as u32, WIN_H as u32)))?;
     canvas.present();
 
     ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
